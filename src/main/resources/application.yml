@@ -1,0 +1,29 @@
+spring:
+  application:
+    name: linkspark-backend
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/linkspark}
+    username: ${DB_USER:linkspark}
+    password: ${DB_PASSWORD:linkspark}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+    show-sql: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:LKtn4r4t0Gp+F4KVOeKem1de2UDHz3bCQxvWbHpGXRY=} # base64
+    access-ttl-seconds: ${JWT_ACCESS_TTL:2592000}   # 30 days
+    refresh-ttl-seconds: ${JWT_REFRESH_TTL:5184000} # 60 days
+    issuer: linkspark
+
+server:
+  port: ${PORT:8000}
+
