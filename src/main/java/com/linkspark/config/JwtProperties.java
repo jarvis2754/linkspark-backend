@@ -6,9 +6,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @ConfigurationProperties(prefix = "app.jwt")
 public class JwtProperties {
-    /**
-     * Secret used for HMAC signing. Keep this out of source control in real deployments.
-     */
+
     private String secret = "dev-secret-change-me";
     private long accessTtlSeconds = 2_592_000; // 30 days
     private long refreshTtlSeconds = 5_184_000; // 60 days

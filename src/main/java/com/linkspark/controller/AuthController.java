@@ -34,8 +34,8 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<Void> logout() {
-        // Stateless JWT; client just drops tokens. Endpoint exists for future blacklisting/session revocation.
-        return ResponseEntity.noContent().build();
+       return ResponseEntity.noContent().build();
     }
 }
+
 
