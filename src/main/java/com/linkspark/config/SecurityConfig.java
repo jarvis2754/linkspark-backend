@@ -32,7 +32,6 @@ public class SecurityConfig {
         this.jwtService = jwtService;
         this.userDetailsService = userDetailsService;
     }
-
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
@@ -41,13 +40,17 @@ public class SecurityConfig {
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
 
-                        .requestMatchers(HttpMethod.POST, "/api/auth/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/links/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/links/**").permitAll()
+                        // Auth routes
+                        .requestMatchers("/api/auth/**").permitAll()
 
-                        .requestMatchers("/actuator/health", "/actuator/info").permitAll()
+                        // ALLOW ALL LINK API CALLS (GET/POST/PUT/DELETE)
+                        .requestMatchers("/api/links/**").permitAll()
 
+                        // Public redirect endpoints like GET /my-alias
                         .requestMatchers(HttpMethod.GET, "/**").permitAll()
+
+                        // Actuator
+                        .requestMatchers("/actuator/**").permitAll()
 
                         .anyRequest().authenticated()
                 )

@@ -4,6 +4,9 @@ import jakarta.persistence.*;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 @Entity
 @Table(name = "links")
@@ -37,5 +40,17 @@ public class Link {
     private int redirectType;
 
     private LocalDateTime createdAt = LocalDateTime.now();
-}
 
+    @Column(nullable = false, columnDefinition = "int4 default 0")
+    private int clicks = 0;
+
+    @Column(nullable = false, columnDefinition = "int4 default 0")
+    private int failedAttempts = 0;
+
+    private LocalDateTime lockedUntil;
+
+    @ElementCollection
+    @CollectionTable(name = "link_week_clicks", joinColumns = @JoinColumn(name = "link_id"))
+    @Column(name = "click")
+    private List<Integer> weekClicks = new ArrayList<>(Arrays.asList(0, 0, 0, 0, 0, 0, 0));
+}
