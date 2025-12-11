@@ -22,6 +22,10 @@ public class Analytics {
 
     private String referer;
 
+    private String country;
+    private String device;
+    private String browser;
+
     private LocalDateTime clickedAt = LocalDateTime.now();
 }
 
