@@ -1,33 +1,29 @@
-package com.linkspark.model;
+package com.linkspark.domain;
 
-import com.linkspark.domain.User;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "team_members")
+@Table(name = "teams")
 @Data
 @NoArgsConstructor
-public class TeamMember {
+public class Team {
 
     @Id
     @GeneratedValue
     private UUID id;
+
+    @Column(nullable = false)
+    private String name;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id", nullable = false)
     private User owner;
 
     @Column(nullable = false)
-    private String email;
-
-    @Column(nullable = false)
-    private String role;
-
-    @Column(nullable = false)
-    private boolean pending = true;
+    private Instant createdAt = Instant.now();
 }
-
