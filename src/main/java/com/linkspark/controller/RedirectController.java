@@ -15,27 +15,21 @@ import java.time.LocalDateTime;
 public class RedirectController {
 
     private final LinkService linkService;
-    private final AnalyticsService analyticsService; // ✅ ADD THIS
+    private final AnalyticsService analyticsService;
 
     @GetMapping("/{alias}")
     public ResponseEntity<?> handleRedirect(
             @PathVariable String alias,
             @RequestParam(value = "token", required = false) String token,
-            HttpServletRequest request   // ✅ REQUIRED FOR analytics
+            HttpServletRequest request
     ) {
         Link link = linkService.getLinkByAlias(alias);
 
-        // ------------------------
-        // 1) EXPIRY CHECK
-        // ------------------------
         if (link.getExpiresAt() != null &&
                 link.getExpiresAt().isBefore(LocalDateTime.now())) {
             return ResponseEntity.status(410).body("Link expired");
         }
 
-        // ------------------------
-        // 2) PASSWORD PROTECTION
-        // ------------------------
         if (link.isPasswordProtect()) {
             if (token == null) {
                 return ResponseEntity.status(302)
@@ -51,19 +45,10 @@ public class RedirectController {
             }
         }
 
-        // ------------------------
-        // 3) RECORD ANALYTICS (BEFORE REDIRECT)
-        // ------------------------
         analyticsService.recordHit(alias, request);
 
-        // ------------------------
-        // 4) INCREMENT CLICK COUNT
-        // ------------------------
         linkService.registerClick(link);
 
-        // ------------------------
-        // 5) REDIRECT TO DESTINATION
-        // ------------------------
         return ResponseEntity.status(302)
                 .header("Location", link.getOriginalUrl())
                 .build();

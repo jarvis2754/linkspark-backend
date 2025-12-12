@@ -1,13 +1,14 @@
 package com.linkspark.config;
 
+import com.linkspark.security.JwtAuthFilter;
 import com.linkspark.service.JwtService;
+import com.linkspark.service.UserService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -26,36 +27,47 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
     private final JwtService jwtService;
+    private final UserService userService;
     private final UserDetailsService userDetailsService;
 
-    public SecurityConfig(JwtService jwtService, UserDetailsService userDetailsService) {
+    public SecurityConfig(
+            JwtService jwtService,
+            UserService userService,
+            UserDetailsService userDetailsService
+    ) {
         this.jwtService = jwtService;
+        this.userService = userService;
         this.userDetailsService = userDetailsService;
     }
+
+    @Bean
+    public JwtAuthFilter jwtAuthFilter() {
+        return new JwtAuthFilter(jwtService, userService);
+    }
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+
         http
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
                 .authorizeHttpRequests(auth -> auth
-
-                        // Auth routes
                         .requestMatchers("/api/auth/**").permitAll()
-
-                        // ALLOW ALL LINK API CALLS (GET/POST/PUT/DELETE)
-                        .requestMatchers("/api/links/**").permitAll()
-
-                        // Public redirect endpoints like GET /my-alias
-                        .requestMatchers(HttpMethod.GET, "/**").permitAll()
-
-                        // Actuator
-                        .requestMatchers("/actuator/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/links/check-alias").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/links/alias/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/links/*/verify").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/{alias}").permitAll()
+                        .requestMatchers("/api/links/**").authenticated()
 
                         .anyRequest().authenticated()
                 )
+
+
+
                 .authenticationProvider(daoAuthenticationProvider())
-                .addFilterBefore(jwtService.authenticationFilter(), UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthFilter(), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
@@ -75,11 +87,6 @@ public class SecurityConfig {
     }
 
     @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
-
-    @Bean
     public AuthenticationProvider daoAuthenticationProvider() {
         DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
         provider.setUserDetailsService(userDetailsService);
@@ -88,7 +95,12 @@ public class SecurityConfig {
     }
 
     @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) throws Exception {
-        return configuration.getAuthenticationManager();
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
+        return config.getAuthenticationManager();
     }
 }

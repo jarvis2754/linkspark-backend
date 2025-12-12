@@ -1,11 +1,11 @@
 package com.linkspark.dto;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
-public class AnalyticsResponse {
+public class UserAnalyticsResponse {
+
     public Metrics metrics;
-    public List<RecentClick> recentClicks;
+    public List<TopLink> topLinks;
 
     public static class Metrics {
         public List<TimeSeriesPoint> timeseries;
@@ -13,14 +13,15 @@ public class AnalyticsResponse {
         public List<DeviceMetric> devices;
         public List<BrowserMetric> browsers;
         public List<ReferrerMetric> referrers;
+
+        public long totalClicks;
+        public long totalLinks;
     }
 
     public static class TimeSeriesPoint {
-        public String timestamp;
         public String date;
         public long clicks;
     }
-
 
     public static class CountryMetric {
         public String country;
@@ -43,12 +44,12 @@ public class AnalyticsResponse {
         public long clicks;
     }
 
-    public static class RecentClick {
-        public LocalDateTime timestamp;
-        public String country;
-        public String referrer;
-        public String device;
-        public String browser;
+    public static class TopLink {
+        public Long linkId;
+        public String url;
+        public String title;
+        public long clicks;
+        public long last24h;
     }
 }
 

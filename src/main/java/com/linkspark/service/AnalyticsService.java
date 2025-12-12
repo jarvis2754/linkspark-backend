@@ -19,9 +19,6 @@ public class AnalyticsService {
 
     private final AnalyticsRepository repo;
 
-    /*-----------------------------------------------------------
-     * RECORD CLICK
-     *-----------------------------------------------------------*/
     public void recordHit(String alias, HttpServletRequest request) {
 
         Analytics a = new Analytics();
@@ -30,21 +27,18 @@ public class AnalyticsService {
         a.setUserAgent(request.getHeader("User-Agent"));
         a.setReferer(request.getHeader("Referer"));
 
-        // Country detection
         String country = request.getHeader("CF-IPCountry");
         if (country == null || country.isBlank()) {
             country = request.getHeader("X-Country");
         }
         a.setCountry(country != null ? country : "UN");
 
-        // Device detection
         String ua = a.getUserAgent() != null ? a.getUserAgent().toLowerCase() : "";
         String device = "desktop";
         if (ua.contains("mobile") || ua.contains("android") || ua.contains("iphone")) device = "mobile";
         if (ua.contains("tablet") || ua.contains("ipad")) device = "tablet";
         a.setDevice(device);
 
-        // Browser
         String browser = "Other";
         if (ua.contains("chrome") && !ua.contains("chromium") && !ua.contains("edg")) browser = "Chrome";
         else if (ua.contains("firefox")) browser = "Firefox";
@@ -56,9 +50,6 @@ public class AnalyticsService {
         repo.save(a);
     }
 
-    /*-----------------------------------------------------------
-     * MAIN METRICS METHOD
-     *-----------------------------------------------------------*/
     public AnalyticsResponse getMetricsForAlias(String alias) {
         return getMetricsForAlias(alias, "30d", null, null);
     }
@@ -70,7 +61,6 @@ public class AnalyticsService {
         AnalyticsResponse resp = new AnalyticsResponse();
         resp.metrics = new AnalyticsResponse.Metrics();
 
-        // Determine timeseries type
         if (range.equals("24h")) {
             resp.metrics.timeseries = buildHourlySeries(rows);
         } else if (range.equals("7d")) {
@@ -86,9 +76,6 @@ public class AnalyticsService {
             resp.metrics.timeseries = buildDailySeries(rows, 30);
         }
 
-        /*-----------------------------------------------------------
-         * COUNTRIES
-         *-----------------------------------------------------------*/
         Map<String, Long> byCountry = rows.stream()
                 .collect(Collectors.groupingBy(
                         r -> r.getCountry() == null ? "UN" : r.getCountry(),
@@ -106,9 +93,6 @@ public class AnalyticsService {
                 .sorted((a, b) -> Long.compare(b.clicks, a.clicks))
                 .toList();
 
-        /*-----------------------------------------------------------
-         * DEVICES
-         *-----------------------------------------------------------*/
         Map<String, Long> byDevice = rows.stream()
                 .collect(Collectors.groupingBy(
                         r -> r.getDevice() == null ? "desktop" : r.getDevice(),
@@ -125,9 +109,6 @@ public class AnalyticsService {
                 .sorted((a, b) -> Long.compare(b.clicks, a.clicks))
                 .toList();
 
-        /*-----------------------------------------------------------
-         * BROWSERS
-         *-----------------------------------------------------------*/
         Map<String, Long> byBrowser = rows.stream()
                 .collect(Collectors.groupingBy(
                         r -> r.getBrowser() == null ? "Other" : r.getBrowser(),
@@ -144,9 +125,6 @@ public class AnalyticsService {
                 .sorted((a, b) -> Long.compare(b.clicks, a.clicks))
                 .toList();
 
-        /*-----------------------------------------------------------
-         * REFERRERS
-         *-----------------------------------------------------------*/
         Map<String, Long> byRef = rows.stream()
                 .map(r -> r.getReferer() == null ? "direct" : r.getReferer())
                 .map(rf -> {
@@ -170,9 +148,6 @@ public class AnalyticsService {
                 .sorted((a, b) -> Long.compare(b.clicks, a.clicks))
                 .toList();
 
-        /*-----------------------------------------------------------
-         * RECENT CLICKS
-         *-----------------------------------------------------------*/
         resp.recentClicks = rows.stream()
                 .limit(50)
                 .map(r -> {
@@ -189,9 +164,6 @@ public class AnalyticsService {
         return resp;
     }
 
-    /*-----------------------------------------------------------
-     * HOURLY SERIES (24h)
-     *-----------------------------------------------------------*/
     private List<AnalyticsResponse.TimeSeriesPoint> buildHourlySeries(List<Analytics> rows) {
 
         LocalDateTime now = LocalDateTime.now();
@@ -220,20 +192,15 @@ public class AnalyticsService {
         return list;
     }
 
-    /*-----------------------------------------------------------
-     * DAILY SERIES (7d / 30d)
-     *-----------------------------------------------------------*/
     private List<AnalyticsResponse.TimeSeriesPoint> buildDailySeries(List<Analytics> rows, int days) {
 
         LocalDate today = LocalDate.now();
         Map<LocalDate, Long> bucket = new LinkedHashMap<>();
 
-        // Create empty buckets
         for (int i = days - 1; i >= 0; i--) {
             bucket.put(today.minusDays(i), 0L);
         }
 
-        // Count clicks
         for (Analytics a : rows) {
             LocalDate d = a.getClickedAt().toLocalDate();
             if (bucket.containsKey(d)) {
@@ -241,7 +208,6 @@ public class AnalyticsService {
             }
         }
 
-        // Convert to list
         List<AnalyticsResponse.TimeSeriesPoint> list = new ArrayList<>();
         for (var e : bucket.entrySet()) {
             AnalyticsResponse.TimeSeriesPoint p = new AnalyticsResponse.TimeSeriesPoint();
@@ -253,9 +219,6 @@ public class AnalyticsService {
         return list;
     }
 
-    /*-----------------------------------------------------------
-     * CUSTOM DAILY RANGE
-     *-----------------------------------------------------------*/
     private List<AnalyticsResponse.TimeSeriesPoint> buildCustomDailySeries(List<Analytics> rows, LocalDate start, LocalDate end) {
 
         Map<LocalDate, Long> bucket = new LinkedHashMap<>();

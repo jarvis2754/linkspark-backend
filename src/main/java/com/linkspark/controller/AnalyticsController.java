@@ -5,6 +5,7 @@ import com.linkspark.service.AnalyticsService;
 import com.linkspark.service.LinkService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -20,14 +21,13 @@ public class AnalyticsController {
             @PathVariable Long id,
             @RequestParam(defaultValue = "7d") String range,
             @RequestParam(required = false) String start,
-            @RequestParam(required = false) String end
+            @RequestParam(required = false) String end,
+            Authentication auth
     ) {
-        var link = linkService.getOneLink(id);
+        var link = linkService.getOneLink(id, auth);
         String alias = link.getAlias();
 
         AnalyticsResponse resp = analyticsService.getMetricsForAlias(alias, range, start, end);
         return ResponseEntity.ok(resp);
     }
-
 }
-

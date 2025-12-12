@@ -1,5 +1,6 @@
 package com.linkspark.model;
 
+import com.linkspark.domain.User;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -48,6 +49,11 @@ public class Link {
     private int failedAttempts = 0;
 
     private LocalDateTime lockedUntil;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "owner_id", nullable = false)
+    private User owner;
+
 
     @ElementCollection
     @CollectionTable(name = "link_week_clicks", joinColumns = @JoinColumn(name = "link_id"))

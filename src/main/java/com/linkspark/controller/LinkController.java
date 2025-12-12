@@ -7,6 +7,7 @@ import com.linkspark.model.Link;
 import com.linkspark.service.LinkService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -20,8 +21,8 @@ public class LinkController {
     private final LinkService linkService;
 
     @PostMapping
-    public ResponseEntity<?> create(@RequestBody CreateLinkRequest req) {
-        String alias = linkService.createLink(req);
+    public ResponseEntity<?> create(@RequestBody CreateLinkRequest req, Authentication auth) {
+        String alias = linkService.createLink(req, auth);
         return ResponseEntity.ok(Map.of("shortUrl", "http://localhost:8000/" + alias));
     }
 
@@ -31,27 +32,28 @@ public class LinkController {
     }
 
     @GetMapping
-    public ResponseEntity<List<LinkDto>> getAll() {
-        return ResponseEntity.ok(linkService.getAllLinks());
+    public ResponseEntity<List<LinkDto>> getAll(Authentication auth) {
+        return ResponseEntity.ok(linkService.getAllLinks(auth));
     }
 
     @GetMapping("/id/{id}")
-    public ResponseEntity<LinkDto> getOne(@PathVariable Long id) {
-        return ResponseEntity.ok(linkService.getOneLink(id));
+    public ResponseEntity<LinkDto> getOne(@PathVariable Long id, Authentication auth) {
+        return ResponseEntity.ok(linkService.getOneLink(id, auth));
     }
 
     @DeleteMapping("{id}")
-    public ResponseEntity<?> delete(@PathVariable Long id) {
-        linkService.delete(id);
+    public ResponseEntity<?> delete(@PathVariable Long id, Authentication auth) {
+        linkService.delete(id, auth);
         return ResponseEntity.ok(Map.of("message", "Deleted"));
     }
 
     @PutMapping("/id/{id}")
     public ResponseEntity<LinkDto> update(
             @PathVariable Long id,
-            @RequestBody UpdateLinkRequest req
+            @RequestBody UpdateLinkRequest req,
+            Authentication auth
     ) {
-        return ResponseEntity.ok(linkService.update(id, req));
+        return ResponseEntity.ok(linkService.update(id, req, auth));
     }
 
     @GetMapping("/alias/{alias}")

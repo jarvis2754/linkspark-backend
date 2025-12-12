@@ -84,9 +84,6 @@ public class JwtService {
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
-    /**
-     * Authentication filter that reads Authorization: Bearer tokens.
-     */
     public OncePerRequestFilter authenticationFilter() {
         return new OncePerRequestFilter() {
             @Override

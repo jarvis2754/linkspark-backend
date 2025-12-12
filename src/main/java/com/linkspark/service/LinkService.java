@@ -5,8 +5,10 @@ import com.linkspark.dto.LinkDto;
 import com.linkspark.dto.UpdateLinkRequest;
 import com.linkspark.model.Link;
 import com.linkspark.repository.LinkRepository;
+import com.linkspark.domain.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,7 +46,9 @@ public class LinkService {
     }
 
     @Transactional
-    public String createLink(CreateLinkRequest req) {
+    public String createLink(CreateLinkRequest req, Authentication auth) {
+
+        User user = (User) auth.getPrincipal();
 
         String alias = (req.getCustomAlias() == null || req.getCustomAlias().isBlank())
                 ? generateRandomAlias()
@@ -61,6 +65,7 @@ public class LinkService {
         link.setTags(req.getTags());
         link.setEnableAnalytics(req.isEnableAnalytics());
         link.setRedirectType(Integer.parseInt(req.getRedirectType()));
+        link.setOwner(user);
 
         if (req.getExpiresAt() != null && !req.getExpiresAt().isBlank()) {
             link.setExpiresAt(LocalDateTime.parse(req.getExpiresAt()));
@@ -86,34 +91,52 @@ public class LinkService {
                 );
     }
 
-    public List<LinkDto> getAllLinks() {
-        return linkRepo.findAll().stream()
+    public List<LinkDto> getAllLinks(Authentication auth) {
+        User user = (User) auth.getPrincipal();
+        return linkRepo.findByOwner(user).stream()
                 .map(this::toDto)
                 .collect(Collectors.toList());
     }
 
-    public LinkDto getOneLink(Long id) {
+    public LinkDto getOneLink(Long id, Authentication auth) {
+        User user = (User) auth.getPrincipal();
+
         Link link = linkRepo.findById(id)
                 .orElseThrow(() ->
                         new ResponseStatusException(HttpStatus.NOT_FOUND, "Link not found")
                 );
+
+        if (!link.getOwner().getId().equals(user.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your link");
+        }
+
         return toDto(link);
     }
 
     @Transactional
-    public void delete(Long id) {
-        if (!linkRepo.existsById(id)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Link not found");
+    public void delete(Long id, Authentication auth) {
+        User user = (User) auth.getPrincipal();
+
+        Link link = linkRepo.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Link not found"));
+
+        if (!link.getOwner().getId().equals(user.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your link");
         }
-        linkRepo.deleteById(id);
+
+        linkRepo.delete(link);
     }
 
     @Transactional
-    public LinkDto update(Long id, UpdateLinkRequest req) {
+    public LinkDto update(Long id, UpdateLinkRequest req, Authentication auth) {
+        User user = (User) auth.getPrincipal();
+
         Link link = linkRepo.findById(id)
-                .orElseThrow(() ->
-                        new ResponseStatusException(HttpStatus.NOT_FOUND, "Link not found")
-                );
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Link not found"));
+
+        if (!link.getOwner().getId().equals(user.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your link");
+        }
 
         if (req.getTitle() != null) link.setTitle(req.getTitle());
         link.setTags(req.getTags());
@@ -231,4 +254,18 @@ public class LinkService {
         tempTokens.remove(token);
         return true;
     }
+
+    public UUID getUserId(Authentication auth) {
+        if (auth == null || !(auth.getPrincipal() instanceof User)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Not authenticated");
+        }
+        User user = (User) auth.getPrincipal();
+        return user.getId();
+    }
+
+    public List<Link> getAllLinksOfUser(UUID userId) {
+        return linkRepo.findByOwnerId(userId);
+    }
+
+
 }
