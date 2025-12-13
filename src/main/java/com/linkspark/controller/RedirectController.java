@@ -3,11 +3,11 @@ package com.linkspark.controller;
 import com.linkspark.model.Link;
 import com.linkspark.service.AnalyticsService;
 import com.linkspark.service.LinkService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
 
 @RestController
@@ -46,7 +46,6 @@ public class RedirectController {
         }
 
         analyticsService.recordHit(alias, request);
-
         linkService.registerClick(link);
 
         return ResponseEntity.status(302)

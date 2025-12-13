@@ -1,5 +1,6 @@
 package com.linkspark.model;
 
+import com.linkspark.domain.Team;
 import com.linkspark.domain.User;
 import jakarta.persistence.*;
 import lombok.Data;
@@ -49,6 +50,11 @@ public class Link {
     private int failedAttempts = 0;
 
     private LocalDateTime lockedUntil;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "team_id")
+    private Team team;
+
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id", nullable = false)

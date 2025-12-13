@@ -20,23 +20,15 @@ public class TeamMember {
     @JoinColumn(name = "team_id", nullable = false)
     private Team team;
 
-    /**
-     * Can be null while invite is pending.
-     * Once invite is accepted this points to the actual user.
-     */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     private User user;
 
-    /**
-     * We keep the email on the member row so we can show pending invites
-     * without requiring a User row to exist.
-     */
     @Column(nullable = false)
     private String email;
 
     @Column(nullable = false)
-    private String role; // owner/admin/editor/viewer
+    private String role;
 
     @Column(nullable = false)
     private boolean pending = true;

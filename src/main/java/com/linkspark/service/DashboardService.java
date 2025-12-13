@@ -56,9 +56,6 @@ public class DashboardService {
 
         resp.summary.weeklyClicks = Arrays.stream(weekly).boxed().toList();
 
-        // ---------------------------
-        // TOP LINKS
-        // ---------------------------
         resp.topLinks = links.stream()
                 .map(l -> {
                     long clicks = rows.stream()
@@ -80,10 +77,6 @@ public class DashboardService {
                 .limit(5)
                 .toList();
 
-
-        // ---------------------------
-        // ACTIVITY FEED
-        // ---------------------------
         resp.activity = rows.stream()
                 .limit(10)
                 .map(a -> {

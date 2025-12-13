@@ -1,11 +1,16 @@
 package com.linkspark.service;
 
+import com.linkspark.domain.Team;
+import com.linkspark.domain.TeamMember;
+import com.linkspark.domain.User;
 import com.linkspark.dto.CreateLinkRequest;
 import com.linkspark.dto.LinkDto;
+import com.linkspark.dto.TeamDto;
 import com.linkspark.dto.UpdateLinkRequest;
 import com.linkspark.model.Link;
 import com.linkspark.repository.LinkRepository;
-import com.linkspark.domain.User;
+import com.linkspark.repository.TeamMemberRepository;
+import com.linkspark.repository.TeamRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
@@ -25,6 +30,8 @@ import java.util.stream.Collectors;
 public class LinkService {
 
     private final LinkRepository linkRepo;
+    private final TeamRepository teamRepo;
+    private final TeamMemberRepository memberRepo;
     private final PasswordEncoder passwordEncoder;
 
     private static final int MAX_FAILED_ATTEMPTS = 5;
@@ -41,8 +48,21 @@ public class LinkService {
         }
     }
 
-    public String generateRandomAlias() {
-        return UUID.randomUUID().toString().substring(0, 6);
+    private TeamMember requireTeamMember(Team team, User user) {
+        return memberRepo.findByTeamAndUser(team, user)
+                .filter(m -> !m.isPending())
+                .orElseThrow(() ->
+                        new ResponseStatusException(HttpStatus.FORBIDDEN, "Not a team member"));
+    }
+
+    private void requireEditPermission(TeamMember m) {
+        if (m.getRole().equals("viewer"))
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+    }
+
+    private void requireDeletePermission(TeamMember m) {
+        if (m.getRole().equals("viewer") || m.getRole().equals("editor"))
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
     }
 
     @Transactional
@@ -51,7 +71,7 @@ public class LinkService {
         User user = (User) auth.getPrincipal();
 
         String alias = (req.getCustomAlias() == null || req.getCustomAlias().isBlank())
-                ? generateRandomAlias()
+                ? UUID.randomUUID().toString().substring(0, 6)
                 : req.getCustomAlias();
 
         if (linkRepo.existsByAlias(alias)) {
@@ -67,6 +87,16 @@ public class LinkService {
         link.setRedirectType(Integer.parseInt(req.getRedirectType()));
         link.setOwner(user);
 
+        if (req.getTeamId() != null) {
+            Team team = teamRepo.findById(req.getTeamId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+
+            TeamMember member = requireTeamMember(team, user);
+            requireEditPermission(member);
+
+            link.setTeam(team);
+        }
+
         if (req.getExpiresAt() != null && !req.getExpiresAt().isBlank()) {
             link.setExpiresAt(LocalDateTime.parse(req.getExpiresAt()));
         }
@@ -80,20 +110,10 @@ public class LinkService {
         return alias;
     }
 
-    public boolean isAliasAvailable(String alias) {
-        return !linkRepo.existsByAlias(alias);
-    }
-
-    public Link getLinkByAlias(String alias) {
-        return linkRepo.findByAlias(alias)
-                .orElseThrow(() ->
-                        new ResponseStatusException(HttpStatus.NOT_FOUND, "Link not found")
-                );
-    }
-
     public List<LinkDto> getAllLinks(Authentication auth) {
         User user = (User) auth.getPrincipal();
-        return linkRepo.findByOwner(user).stream()
+        return linkRepo.findAllAccessibleLinks(user.getId())
+                .stream()
                 .map(this::toDto)
                 .collect(Collectors.toList());
     }
@@ -102,40 +122,31 @@ public class LinkService {
         User user = (User) auth.getPrincipal();
 
         Link link = linkRepo.findById(id)
-                .orElseThrow(() ->
-                        new ResponseStatusException(HttpStatus.NOT_FOUND, "Link not found")
-                );
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
 
-        if (!link.getOwner().getId().equals(user.getId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your link");
+        if (link.getTeam() == null) {
+            if (!link.getOwner().getId().equals(user.getId()))
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        } else {
+            requireTeamMember(link.getTeam(), user);
         }
 
         return toDto(link);
     }
 
     @Transactional
-    public void delete(Long id, Authentication auth) {
-        User user = (User) auth.getPrincipal();
-
-        Link link = linkRepo.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Link not found"));
-
-        if (!link.getOwner().getId().equals(user.getId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your link");
-        }
-
-        linkRepo.delete(link);
-    }
-
-    @Transactional
     public LinkDto update(Long id, UpdateLinkRequest req, Authentication auth) {
+
         User user = (User) auth.getPrincipal();
-
         Link link = linkRepo.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Link not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
 
-        if (!link.getOwner().getId().equals(user.getId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your link");
+        if (link.getTeam() == null) {
+            if (!link.getOwner().getId().equals(user.getId()))
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        } else {
+            TeamMember m = requireTeamMember(link.getTeam(), user);
+            requireEditPermission(m);
         }
 
         if (req.getTitle() != null) link.setTitle(req.getTitle());
@@ -162,42 +173,41 @@ public class LinkService {
             link.setRedirectType(req.getRedirectType());
         }
 
-        linkRepo.save(link);
-        return toDto(link);
-    }
-
-    private LinkDto toDto(Link link) {
-        LinkDto d = new LinkDto();
-        d.setId(link.getId());
-        d.setTitle(link.getTitle());
-        d.setOriginalUrl(link.getOriginalUrl());
-        d.setAlias(link.getAlias());
-        d.setShortUrl("http://localhost:8000/" + link.getAlias());
-        d.setClicks(link.getClicks());
-        d.setWeekClicks(link.getWeekClicks());
-        d.setPasswordProtected(link.isPasswordProtect());
-        d.setExpiresAt(link.getExpiresAt());
-        d.setEnableAnalytics(link.isEnableAnalytics());
-        return d;
+        return toDto(linkRepo.save(link));
     }
 
     @Transactional
-    public void registerClick(Link link) {
-        link.setClicks(link.getClicks() + 1);
+    public void delete(Long id, Authentication auth) {
 
-        List<Integer> week = new ArrayList<>(link.getWeekClicks());
-        int last = week.size() - 1;
-        week.set(last, week.get(last) + 1);
-        link.setWeekClicks(week);
+        User user = (User) auth.getPrincipal();
+        Link link = linkRepo.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
 
-        linkRepo.save(link);
+        if (link.getTeam() == null) {
+            if (!link.getOwner().getId().equals(user.getId()))
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        } else {
+            TeamMember m = requireTeamMember(link.getTeam(), user);
+            requireDeletePermission(m);
+        }
+
+        linkRepo.delete(link);
+    }
+
+    public boolean isAliasAvailable(String alias) {
+        return !linkRepo.existsByAlias(alias);
+    }
+
+    public Link getLinkByAlias(String alias) {
+        return linkRepo.findByAlias(alias)
+                .orElseThrow(() ->
+                        new ResponseStatusException(HttpStatus.NOT_FOUND, "Link not found"));
     }
 
     public long getRemainingLockSeconds(Link link) {
         if (link.getLockedUntil() == null) return 0;
-        LocalDateTime now = LocalDateTime.now();
-        if (link.getLockedUntil().isBefore(now)) return 0;
-        return Duration.between(now, link.getLockedUntil()).getSeconds();
+        if (link.getLockedUntil().isBefore(LocalDateTime.now())) return 0;
+        return Duration.between(LocalDateTime.now(), link.getLockedUntil()).getSeconds();
     }
 
     @Transactional
@@ -205,28 +215,28 @@ public class LinkService {
 
         Link link = getLinkByAlias(alias);
 
-        if (link.getExpiresAt() != null && link.getExpiresAt().isBefore(LocalDateTime.now())) {
+        if (link.getExpiresAt() != null &&
+                link.getExpiresAt().isBefore(LocalDateTime.now())) {
             throw new ResponseStatusException(HttpStatus.GONE, "Link expired");
         }
 
         long lock = getRemainingLockSeconds(link);
         if (lock > 0) {
-            throw new ResponseStatusException(HttpStatus.LOCKED, "Link locked for " + lock + " seconds");
+            throw new ResponseStatusException(HttpStatus.LOCKED);
         }
 
         if (link.getPasswordHash() == null) return null;
 
-        boolean matches = passwordEncoder.matches(rawPassword, link.getPasswordHash());
-
-        if (matches) {
+        if (passwordEncoder.matches(rawPassword, link.getPasswordHash())) {
             link.setFailedAttempts(0);
             link.setLockedUntil(null);
             linkRepo.save(link);
 
             String token = UUID.randomUUID().toString();
-            tempTokens.put(token, new TempToken(alias,
-                    LocalDateTime.now().plusSeconds(ttlSeconds)));
-
+            tempTokens.put(
+                    token,
+                    new TempToken(alias, LocalDateTime.now().plusSeconds(ttlSeconds))
+            );
             return token;
         }
 
@@ -246,6 +256,7 @@ public class LinkService {
         TempToken t = tempTokens.get(token);
         if (t == null) return false;
         if (!t.alias.equals(alias)) return false;
+
         if (t.expiresAt.isBefore(LocalDateTime.now())) {
             tempTokens.remove(token);
             return false;
@@ -255,16 +266,41 @@ public class LinkService {
         return true;
     }
 
-    public UUID getUserId(Authentication auth) {
-        if (auth == null || !(auth.getPrincipal() instanceof User)) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Not authenticated");
-        }
-        User user = (User) auth.getPrincipal();
-        return user.getId();
+    @Transactional
+    public void registerClick(Link link) {
+        link.setClicks(link.getClicks() + 1);
+
+        List<Integer> week = new ArrayList<>(link.getWeekClicks());
+        int last = week.size() - 1;
+        week.set(last, week.get(last) + 1);
+
+        link.setWeekClicks(week);
+        linkRepo.save(link);
     }
 
-    public List<Link> getAllLinksOfUser(UUID userId) {
-        return linkRepo.findByOwnerId(userId);
+    private LinkDto toDto(Link link) {
+        LinkDto d = new LinkDto();
+        d.setId(link.getId());
+        d.setTitle(link.getTitle());
+        d.setOriginalUrl(link.getOriginalUrl());
+        d.setAlias(link.getAlias());
+        d.setShortUrl("http://localhost:8000/" + link.getAlias());
+        d.setClicks(link.getClicks());
+        d.setWeekClicks(link.getWeekClicks());
+        d.setPasswordProtected(link.isPasswordProtect());
+        d.setExpiresAt(link.getExpiresAt());
+        d.setEnableAnalytics(link.isEnableAnalytics());
+
+        if (link.getTeam() != null) {
+            d.setTeam(new TeamDto(
+                    link.getTeam().getId(),
+                    link.getTeam().getName()
+            ));
+        } else {
+            d.setTeam(null);
+        }
+
+        return d;
     }
 
 

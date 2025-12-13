@@ -17,25 +17,21 @@ public class TeamController {
 
     private final TeamService teamService;
 
-    // CREATE TEAM
     @PostMapping
     public ResponseEntity<?> createTeam(Authentication auth, @RequestBody TeamDtos.CreateTeamRequest req) {
         return ResponseEntity.ok(teamService.createTeam(auth, req));
     }
 
-    // GET TEAM DETAILS + MEMBERS
     @GetMapping("/{teamId}")
     public ResponseEntity<?> getTeam(@PathVariable UUID teamId) {
         return ResponseEntity.ok(teamService.getTeam(teamId));
     }
 
-    // 🔥 GET ALL TEAMS USER BELONGS TO
     @GetMapping("/my-teams")
     public ResponseEntity<?> getMyTeams(Authentication auth) {
         return ResponseEntity.ok(teamService.getMyTeams(auth));
     }
 
-    // INVITE MEMBER
     @PostMapping("/{teamId}/invite")
     public ResponseEntity<?> invite(
             Authentication auth,
@@ -46,14 +42,12 @@ public class TeamController {
         return ResponseEntity.ok(Map.of("message", "Invite sent"));
     }
 
-    // ACCEPT INVITE
     @PostMapping("/accept/{token}")
     public ResponseEntity<?> acceptInvite(Authentication auth, @PathVariable String token) {
         teamService.acceptInvite(auth, token);
         return ResponseEntity.ok(Map.of("message", "Invite accepted"));
     }
 
-    // REMOVE MEMBER
     @DeleteMapping("/{teamId}/member/{memberId}")
     public ResponseEntity<?> removeMember(
             Authentication auth,
@@ -64,7 +58,6 @@ public class TeamController {
         return ResponseEntity.ok(Map.of("message", "Removed"));
     }
 
-    // CHANGE ROLE
     @PatchMapping("/{teamId}/member/{memberId}/role")
     public ResponseEntity<?> changeRole(
             Authentication auth,
@@ -76,7 +69,6 @@ public class TeamController {
         return ResponseEntity.ok(Map.of("message", "Role updated"));
     }
 
-    // UPDATE TEAM NAME
     @PatchMapping("/{teamId}")
     public ResponseEntity<?> updateTeam(
             Authentication auth,

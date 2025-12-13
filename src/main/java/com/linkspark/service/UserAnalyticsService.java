@@ -21,13 +21,19 @@ public class UserAnalyticsService {
     private final AnalyticsRepository analyticsRepo;
     private final LinkService linkService;
 
-    public UserAnalyticsResponse getUserMetrics(Authentication auth, String range, String start, String end) {
+    public UserAnalyticsResponse getUserMetrics(
+            Authentication auth,
+            String range,
+            String start,
+            String end
+    ) {
 
-        UUID userId = linkService.getUserId(auth);
+        List<Link> accessibleLinks = linkService.getAllLinks(auth)
+                .stream()
+                .map(dto -> linkService.getLinkByAlias(dto.getAlias()))
+                .toList();
 
-        List<Link> userLinks = linkService.getAllLinksOfUser(userId);
-
-        List<String> aliases = userLinks.stream()
+        List<String> aliases = accessibleLinks.stream()
                 .map(Link::getAlias)
                 .toList();
 
@@ -39,22 +45,29 @@ public class UserAnalyticsService {
         UserAnalyticsResponse resp = new UserAnalyticsResponse();
         resp.metrics = new UserAnalyticsResponse.Metrics();
 
-        if (range.equals("7d"))
+        if ("7d".equals(range))
             resp.metrics.timeseries = buildDaily(rows, 7);
-        else if (range.equals("30d"))
+        else if ("30d".equals(range))
             resp.metrics.timeseries = buildDaily(rows, 30);
-        else if (range.equals("90d"))
+        else if ("90d".equals(range))
             resp.metrics.timeseries = buildDaily(rows, 90);
         else if (start != null && end != null)
-            resp.metrics.timeseries = buildCustomDaily(rows, LocalDate.parse(start), LocalDate.parse(end));
+            resp.metrics.timeseries = buildCustomDaily(
+                    rows,
+                    LocalDate.parse(start),
+                    LocalDate.parse(end)
+            );
         else
             resp.metrics.timeseries = buildDaily(rows, 7);
 
         resp.metrics.totalClicks = rows.size();
-        resp.metrics.totalLinks = userLinks.size();
+        resp.metrics.totalLinks = accessibleLinks.size();
 
         resp.metrics.countries = rows.stream()
-                .collect(Collectors.groupingBy(a -> a.getCountry(), Collectors.counting()))
+                .collect(Collectors.groupingBy(
+                        Analytics::getCountry,
+                        Collectors.counting()
+                ))
                 .entrySet().stream()
                 .map(e -> {
                     var c = new UserAnalyticsResponse.CountryMetric();
@@ -67,7 +80,10 @@ public class UserAnalyticsService {
                 .toList();
 
         resp.metrics.devices = rows.stream()
-                .collect(Collectors.groupingBy(a -> a.getDevice(), Collectors.counting()))
+                .collect(Collectors.groupingBy(
+                        Analytics::getDevice,
+                        Collectors.counting()
+                ))
                 .entrySet().stream()
                 .map(e -> {
                     var d = new UserAnalyticsResponse.DeviceMetric();
@@ -79,7 +95,10 @@ public class UserAnalyticsService {
                 .toList();
 
         resp.metrics.browsers = rows.stream()
-                .collect(Collectors.groupingBy(a -> a.getBrowser(), Collectors.counting()))
+                .collect(Collectors.groupingBy(
+                        Analytics::getBrowser,
+                        Collectors.counting()
+                ))
                 .entrySet().stream()
                 .map(e -> {
                     var b = new UserAnalyticsResponse.BrowserMetric();
@@ -103,24 +122,29 @@ public class UserAnalyticsService {
                 .sorted((a, b) -> Long.compare(b.clicks, a.clicks))
                 .toList();
 
-        resp.topLinks = userLinks.stream().map(l -> {
+        resp.topLinks = accessibleLinks.stream().map(l -> {
 
-            List<Analytics> linkRows = rows.stream()
-                    .filter(a -> a.getAlias().equals(l.getAlias()))
-                    .toList();
+                    List<Analytics> linkRows = rows.stream()
+                            .filter(a -> a.getAlias().equals(l.getAlias()))
+                            .toList();
 
-            UserAnalyticsResponse.TopLink t = new UserAnalyticsResponse.TopLink();
-            t.linkId = l.getId();
-            t.url = l.getOriginalUrl();
-            t.title = l.getTitle();
-            t.clicks = linkRows.size();
-            t.last24h = linkRows.stream()
-                    .filter(a -> a.getClickedAt().isAfter(LocalDateTime.now().minusHours(24)))
-                    .count();
+                    UserAnalyticsResponse.TopLink t =
+                            new UserAnalyticsResponse.TopLink();
 
-            return t;
+                    t.linkId = l.getId();
+                    t.url = l.getOriginalUrl();
+                    t.title = l.getTitle();
+                    t.clicks = linkRows.size();
+                    t.last24h = linkRows.stream()
+                            .filter(a ->
+                                    a.getClickedAt()
+                                            .isAfter(LocalDateTime.now().minusHours(24)))
+                            .count();
 
-        }).sorted((a, b) -> Long.compare(b.clicks, a.clicks)).toList();
+                    return t;
+
+                }).sorted((a, b) -> Long.compare(b.clicks, a.clicks))
+                .toList();
 
         return resp;
     }
@@ -128,13 +152,16 @@ public class UserAnalyticsService {
     private String cleanDomain(String url) {
         try {
             URI u = new URI(url);
-            return u.getHost() == null ? "direct" : u.getHost().replace("www.", "");
+            return u.getHost() == null
+                    ? "direct"
+                    : u.getHost().replace("www.", "");
         } catch (Exception e) {
             return "direct";
         }
     }
 
-    private List<UserAnalyticsResponse.TimeSeriesPoint> buildDaily(List<Analytics> rows, int days) {
+    private List<UserAnalyticsResponse.TimeSeriesPoint> buildDaily(
+            List<Analytics> rows, int days) {
 
         LocalDate today = LocalDate.now();
         Map<LocalDate, Long> bucket = new LinkedHashMap<>();

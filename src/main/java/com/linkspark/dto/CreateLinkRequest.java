@@ -2,6 +2,8 @@ package com.linkspark.dto;
 
 import lombok.Data;
 
+import java.util.UUID;
+
 @Data
 public class CreateLinkRequest {
     private String title;
@@ -13,5 +15,6 @@ public class CreateLinkRequest {
     private String password;
     private boolean enableAnalytics;
     private String redirectType;
+    private UUID teamId;
 }
 

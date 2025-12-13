@@ -17,5 +17,7 @@ public class LinkDto {
     private LocalDateTime expiresAt;
     private boolean enableAnalytics;
     private String alias;
+    private TeamDto team;
+
 }
 

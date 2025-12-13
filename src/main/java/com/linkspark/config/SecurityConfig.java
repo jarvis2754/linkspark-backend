@@ -64,8 +64,6 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
 
-
-
                 .authenticationProvider(daoAuthenticationProvider())
                 .addFilterBefore(jwtAuthFilter(), UsernamePasswordAuthenticationFilter.class);
 

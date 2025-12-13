@@ -28,9 +28,6 @@ public class TeamService {
     private final TeamInviteRepository inviteRepo;
     private final UserService userService;
 
-    // -----------------------------------------
-    // CREATE TEAM
-    // -----------------------------------------
     @Transactional
     public Team createTeam(Authentication auth, TeamDtos.CreateTeamRequest req) {
         User owner = (User) auth.getPrincipal();
@@ -41,7 +38,6 @@ public class TeamService {
 
         teamRepo.save(team);
 
-        // Owner must also be stored in TeamMember
         TeamMember ownerMember = new TeamMember();
         ownerMember.setTeam(team);
         ownerMember.setUser(owner);
@@ -54,9 +50,6 @@ public class TeamService {
         return team;
     }
 
-    // -----------------------------------------
-    // GET TEAM INFO + MEMBERS
-    // -----------------------------------------
     public TeamDtos.TeamDto getTeam(UUID teamId) {
         Team team = teamRepo.findById(teamId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
@@ -79,9 +72,6 @@ public class TeamService {
         return new TeamDtos.TeamDto(team.getId().toString(), team.getName(), list);
     }
 
-    // -----------------------------------------
-    // INVITE MEMBER
-    // -----------------------------------------
     @Transactional
     public void inviteUser(Authentication auth, UUID teamId, TeamDtos.InviteRequest req) {
         User inviter = (User) auth.getPrincipal();
@@ -89,7 +79,6 @@ public class TeamService {
         Team team = teamRepo.findById(teamId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
 
-        // Only owner/admin can invite
         TeamMember inv = memberRepo.findByTeamAndUser(team, inviter)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN));
 
@@ -98,12 +87,10 @@ public class TeamService {
 
         String email = req.email().toLowerCase();
 
-        // Prevent duplicate pending member
         memberRepo.findByTeamAndEmail(team, email).ifPresent(existing -> {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Member or invite already exists");
         });
 
-        // create invite token
         TeamInvite invite = new TeamInvite();
         invite.setTeam(team);
         invite.setEmail(email);
@@ -113,10 +100,9 @@ public class TeamService {
 
         inviteRepo.save(invite);
 
-        // create a pending TeamMember row so frontend can show pending invites immediately
         TeamMember pendingMember = new TeamMember();
         pendingMember.setTeam(team);
-        pendingMember.setUser(null); // no user yet
+        pendingMember.setUser(null);
         pendingMember.setEmail(email);
         pendingMember.setRole(req.role());
         pendingMember.setPending(true);
@@ -124,9 +110,6 @@ public class TeamService {
         memberRepo.save(pendingMember);
     }
 
-    // -----------------------------------------
-    // ACCEPT INVITE
-    // -----------------------------------------
     @Transactional
     public void acceptInvite(Authentication auth, String token) {
         User user = (User) auth.getPrincipal();
@@ -137,24 +120,18 @@ public class TeamService {
         if (invite.getExpiresAt().isBefore(Instant.now()))
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invite expired");
 
-        // Find the pending TeamMember row by team + email
         TeamMember pending = memberRepo.findByTeamAndEmail(invite.getTeam(), invite.getEmail())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Pending membership not found"));
 
-        // attach user and mark as active
         pending.setUser(user);
         pending.setPending(false);
-        pending.setEmail(user.getEmail()); // keep email consistent (optional)
+        pending.setEmail(user.getEmail());
 
         memberRepo.save(pending);
 
-        // remove invite
         inviteRepo.delete(invite);
     }
 
-    // -----------------------------------------
-    // REMOVE MEMBER
-    // -----------------------------------------
     @Transactional
     public void removeMember(Authentication auth, UUID teamId, UUID memberId) {
         User requester = (User) auth.getPrincipal();
@@ -177,9 +154,6 @@ public class TeamService {
         memberRepo.delete(target);
     }
 
-    // -----------------------------------------
-    // CHANGE ROLE
-    // -----------------------------------------
     @Transactional
     public void changeRole(Authentication auth, UUID teamId, UUID memberId, TeamDtos.ChangeRoleRequest req) {
         User requester = (User) auth.getPrincipal();
@@ -200,9 +174,6 @@ public class TeamService {
         memberRepo.save(target);
     }
 
-    // -----------------------------------------
-    // GET TEAMS USER BELONGS TO (SUMMARY)
-    // -----------------------------------------
     public List<TeamDtos.TeamSummaryDto> getMyTeams(Authentication auth) {
         User user = (User) auth.getPrincipal();
 
@@ -224,7 +195,6 @@ public class TeamService {
         Team team = teamRepo.findById(teamId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
 
-        // Only owner can rename team
         if (!team.getOwner().getId().equals(requester.getId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only owner can rename team");
         }
@@ -242,17 +212,14 @@ public class TeamService {
         Team team = teamRepo.findById(teamId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
 
-        // Only owner can delete
         if (!team.getOwner().getId().equals(requester.getId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only owner can delete team");
         }
 
-        // Delete all members first
         List<TeamMember> members = memberRepo.findByTeam(team);
         memberRepo.deleteAll(members);
 
-        // Delete invites
-        inviteRepo.deleteAll(inviteRepo.findAll()); // If needed you can filter by team
+        inviteRepo.deleteAll(inviteRepo.findAll());
 
         teamRepo.delete(team);
     }
@@ -272,7 +239,4 @@ public class TeamService {
                 ))
                 .toList();
     }
-
-
-
 }
