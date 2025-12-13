@@ -1,5 +1,6 @@
 package com.linkspark.domain;
 
+import com.linkspark.model.enums.AuthProvider;
 import jakarta.persistence.*;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -8,7 +9,6 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
-
 @Entity
 @Table(name = "users")
 public class User implements UserDetails {
@@ -23,11 +23,19 @@ public class User implements UserDetails {
     @Column(nullable = false, unique = true)
     private String email;
 
-    @Column(nullable = false)
+    @Column
     private String passwordHash;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
+    private AuthProvider provider = AuthProvider.LOCAL;
+
+    @Column
+    private String providerId;
+
+    @Column(nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
+
 
     public UUID getId() {
         return id;
@@ -50,7 +58,7 @@ public class User implements UserDetails {
     }
 
     public void setEmail(String email) {
-        this.email = email;
+        this.email = email.toLowerCase();
     }
 
     public String getPasswordHash() {
@@ -61,12 +69,24 @@ public class User implements UserDetails {
         this.passwordHash = passwordHash;
     }
 
-    public Instant getCreatedAt() {
-        return createdAt;
+    public AuthProvider getProvider() {
+        return provider;
     }
 
-    public void setCreatedAt(Instant createdAt) {
-        this.createdAt = createdAt;
+    public void setProvider(AuthProvider provider) {
+        this.provider = provider;
+    }
+
+    public String getProviderId() {
+        return providerId;
+    }
+
+    public void setProviderId(String providerId) {
+        this.providerId = providerId;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
     }
 
     @Override
@@ -104,5 +124,3 @@ public class User implements UserDetails {
         return true;
     }
 }
-
-
