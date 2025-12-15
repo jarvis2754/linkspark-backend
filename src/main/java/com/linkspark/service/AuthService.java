@@ -31,8 +31,6 @@ public class AuthService {
         this.jwtService = jwtService;
     }
 
-    // ---------------- SIGNUP (EMAIL/PASSWORD) ----------------
-
     @Transactional
     public AuthDtos.TokenResponse signup(AuthDtos.SignupRequest request) {
 
@@ -54,14 +52,11 @@ public class AuthService {
         return new AuthDtos.TokenResponse(access, refresh);
     }
 
-    // ---------------- LOGIN (EMAIL/PASSWORD) ----------------
-
     public AuthDtos.TokenResponse login(AuthDtos.LoginRequest request) {
 
         User user = userRepository.findByEmail(request.email().toLowerCase())
                 .orElseThrow(() -> new IllegalArgumentException("Invalid credentials"));
 
-        // 🚫 BLOCK OAuth users from password login
         if (user.getProvider() != AuthProvider.LOCAL) {
             throw new IllegalArgumentException(
                     "This account uses social login. Please sign in with Google/GitHub."
@@ -82,8 +77,6 @@ public class AuthService {
 
         return new AuthDtos.TokenResponse(access, refresh);
     }
-
-    // ---------------- REFRESH TOKEN ----------------
 
     public AuthDtos.TokenResponse refresh(AuthDtos.RefreshRequest request) {
 

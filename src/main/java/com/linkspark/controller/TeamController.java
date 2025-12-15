@@ -88,7 +88,4 @@ public class TeamController {
     public ResponseEntity<?> getMyInvites(Authentication auth) {
         return ResponseEntity.ok(teamService.getMyInvites(auth));
     }
-
-
-
 }
